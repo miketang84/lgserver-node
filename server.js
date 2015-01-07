@@ -4,7 +4,7 @@ var msgpack = require('msgpack');
 var zmq = require('zmq');
 var uuid = require('node-uuid');
 
-var config = require('config');
+var config = require('./config');
 
 
 var CONNS = {}
