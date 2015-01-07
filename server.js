@@ -22,7 +22,7 @@ var bindZmq = function () {
 bindZmq();
 
 var makeUuid = function () {
-    uuid.v1();
+    return uuid.v1();
 }
 
 var recordConn = function (request, response) {
