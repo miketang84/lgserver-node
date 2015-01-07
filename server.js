@@ -4,7 +4,7 @@ var msgpack = require('msgpack');
 var zmq = require('zmq');
 var uuid = require('node-uuid');
 
-var config = require('./config');
+var config = require('./config').config;
 
 
 var CONNS = {}
@@ -12,6 +12,9 @@ var CH_PUSH;
 var CH_PULL;
 
 var bindZmq = function () {
+    console.log("===========================");
+    console.log('config is:', config);
+    console.log("===========================");
     var send_spec = config.send_spec;
     var recv_spec = config.recv_spec;
     CH_PUSH = zmq.socket('push');
@@ -62,7 +65,6 @@ var responseData = function (conn_id, data) {
 
 function start() {
     function onRequest(request, response) {
-        console.log("Request received.");
         var url_obj = url.parse(request.url);
         //console.log(url_obj);
         var headers = request.headers;
@@ -70,8 +72,8 @@ function start() {
         var remote_ip = headers['x-forwarded-for'] || request.connection.remoteAddress;
 
         var forward_req = {
-            headers = {},
-            meta = {}
+            headers: {},
+            meta: {}
         };
 
         for (var key in headers) {
@@ -124,7 +126,6 @@ function start() {
         // we need to clear CONNS when client connection aborts.
         // how to do???
     });
-    console.log("Server has started.");
 }
 
 exports.start = start;
