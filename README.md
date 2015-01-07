@@ -27,3 +27,9 @@ lgsever-node
 TODO：
 1. 连接断开时的事件响应，清理CONNS表；
 
+
+用法
+====
+```
+    node index.js
+```
