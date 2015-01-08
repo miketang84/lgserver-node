@@ -33,3 +33,16 @@ TODO：
 ```
     node index.js
 ```
+
+性能
+====
+```
+mike@mike-T410s:~/GIT/wrk$ Running 30s test @ http://127.0.0.1:8888/123/eee?fff=22
+  1 threads and 40 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency    14.11ms    1.38ms  35.17ms   87.30%
+    Req/Sec     2.87k   330.59     3.40k    60.20%
+  84941 requests in 30.00s, 13.69MB read
+Requests/sec:   2831.39
+Transfer/sec:    467.29KB
+```
