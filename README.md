@@ -1,7 +1,10 @@
-**lgsever-node**
+lgsever-node
+============
 
-功能需求
-========
+lgserver-node 是使用node写的一个http server及消息分发器。
+
+## 功能需求
+
 1. daemon 后台运行(forever);
 2. msgpack 库引入，作为与bamboo的传输内容协议；
 3. zmq 库监听；
@@ -15,33 +18,33 @@
 11. 读取body，处理文件上传;
 12. 清理CONNS表，防止内存泄漏；
 
-简化之处
-========
+## 简化之处
+
 1. 不提供静态文件服务能力；
 2. 简化配置，不提供多routes功能；
 3. 不向handler发送disconnect事件；
 
 
-依赖
-====
+## 依赖
+
 1. zmq;
 2. msgpack;
 3. node-uuid;
 
 
-问题
-====
+## 问题
+
 TODO：
 
 
-用法
-====
+## 用法
+
 ```
     node index.js
 ```
 
-性能
-====
+## 性能
+
 ```
 mike@mike-T410s:~/GIT/wrk$ Running 30s test @ http://127.0.0.1:8888/123/eee?fff=22
   1 threads and 40 connections
