@@ -71,7 +71,8 @@ var wrap = function (res) {
     return res;
 }
 
-var pushRequest = function (forward_req, request, response) {
+var pushRequest = function (conn_id, forward_req) {
+    forward_req.meta.conn_id = conn_id; 
     CH_PUSH.send(msgpack.pack(forward_req));
 }
 
@@ -83,6 +84,27 @@ var responseData = function (conn_id, data) {
         response.end();
     }
 }
+
+function retreiveBody(request, response, callback) {
+    if (typeof callback !== 'function') return null;
+
+    var queryData = [];
+    request.on('data', function(data) {
+        queryData.push(data);
+        if (queryData.length > 1e6) {
+            queryData = [];
+            response.writeHead(413, {'Content-Type': 'text/plain'}).end();
+            request.connection.destroy();
+        }
+    });
+
+    request.on('end', function() {
+        callback(queryData.join());
+    });
+
+}
+
+
 
 function start() {
     function onRequest(request, response) {
@@ -107,47 +129,56 @@ function start() {
         forward_req.version = request.httpVersion;
         forward_req.path = url_obj['pathname'];
         
-        // nodejs default registered two callbacks arealdy on 'close' event
-        if (request.connection.listeners('close').length == 2) {
-            request.connection.on('close', function () {
-                console.log('--> connection closed')
-                removeConn(conn_id);
-            });
-        }
 
-        // nodejs default registered one callback arealdy on 'timeout' event
-        if (request.connection.listeners('timeout').length == 1) {
-            request.connection.on('timeout', function () {
-                console.log('--> connection timeout')
-                removeConn(conn_id);
-            });
-        }
-       
-        //console.log('record event callback length: ', request.connection.listeners('record').length);
-        // custom event type, used to record the connection key
-        if (request.connection.listeners('record').length == 0) {
-            // first, record the connection 
-            var conn_id = recordConn(response);
-            forward_req.meta.conn_id = conn_id; 
+        var processCallback = function (body) {
+            if (body)
+                forward_req.body = body;
 
-            //console.log(forward_req);
-            pushRequest(forward_req);
+            // custom event type, used to record the connection key
+            if (request.connection.listeners('record').length == 0) {
+                // first, record the connection 
+                var conn_id = recordConn(response);
+                pushRequest(conn_id, forward_req);
 
-            // register a callback to return conn_id for next request on the same keep-alive connection
-            request.connection.on('record', function () {
-                //console.log('--> call record callback');
+                // register a callback to return conn_id for next request on the same keep-alive connection
+                request.connection.on('record', function () {
+                    //console.log('--> call record callback');
 
-                return conn_id;
-            });
+                    return conn_id;
+                });
+            
+                // nodejs default registered two callbacks arealdy on 'close' event
+                request.connection.on('close', function () {
+                    console.log('--> connection closed')
+                    removeConn(conn_id);
+                });
+
+                // nodejs default registered one callback arealdy on 'timeout' event
+                request.connection.on('timeout', function () {
+                    console.log('--> connection timeout')
+                    removeConn(conn_id);
+                });
+
+           }
+            else {
+                var conn_id = request.connection.listeners('record')[0](); 
+                //console.log('conn key: ', conn_id);
+                refreshResponse(conn_id, response);
+                pushRequest(conn_id, forward_req);
+
+            }
+        
+
+        };
+
+
+        if (request.method == 'POST') {
+            retreiveBody(request, response, processCallback);
         }
         else {
-            var conn_id = request.connection.listeners('record')[0](); 
-            //console.log('conn key: ', conn_id);
-            refreshResponse(conn_id, response);
-            forward_req.meta.conn_id = conn_id; 
-            pushRequest(forward_req);
- 
+            processCallback(null);
         }
+
     }
 
     // listen to the returned zmq pull channel
