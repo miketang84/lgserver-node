@@ -3,15 +3,31 @@ var url = require("url");
 var msgpack = require('msgpack');
 var zmq = require('zmq');
 var uuid = require('node-uuid');
+var assert = require('assert');
 
-var config = require('./config').config;
+// load the config file
+var arguments = process.argv.splice(2);
+var config = {};
+var config_file = arguments[0]; 
+if (!config_file) {
+    config = require('./config').config;
+}
+else {
+    config = require('./'+config_file).config;
+}
+
+// assert basic configuration
+assert.ok(config.send_spec, 'Missing send_spec in config file.');
+assert.ok(config.recv_spec, 'Missing recv_spec in config file.');
+assert.ok(config.addr, 'Missing addr in config file.');
+assert.ok(config.port, 'Missing port in config file.');
 
 
 var CONNS = {}
 var CH_PUSH;
 var CH_PULL;
 
-var bindZmq = function () {
+var makeChannel = function () {
     console.log("===========================");
     console.log('config is:', config);
     console.log("===========================");
@@ -22,20 +38,25 @@ var bindZmq = function () {
     CH_PULL = zmq.socket('pull');
     CH_PULL.bind(recv_spec);
 }
-bindZmq();
+makeChannel ();
 
 var makeUuid = function () {
     return uuid.v1();
 }
 
-var recordConn = function (request, response) {
+var recordConn = function (response) {
     var uuid = makeUuid();
-    CONNS[uuid] = [request, response];
+    CONNS[uuid] = response;
 
     return uuid;
 }
 
+var refreshResponse = function (uuid, response) {
+    CONNS[uuid] = response;
+}
+
 var removeConn = function (key) {
+    console.log('remove connection ', key);
     delete CONNS[key]; 
 }
 
@@ -45,18 +66,18 @@ var wrap = function (res) {
     res.status = res.status || "OK";
     res.headers = res.headers || {};
     res.headers['content-type'] = res.headers['content-type'] || 'text/plain';
-    res.headers['content-length'] = res.headers['content-length'] || body.length;
+    res.data = res.data || '';
+    res.headers['content-length'] = res.headers['content-length'] || (res.data && res.data.length || 0);
+    return res;
 }
 
 var pushRequest = function (forward_req, request, response) {
-    CH_PULL.send(msgpack.pack(forward_req));
+    CH_PUSH.send(msgpack.pack(forward_req));
 }
 
 var responseData = function (conn_id, data) {
-    var conn_obj = CONNS[conn_id];
-    if (conn_obj) {
-        var response = conn_obj[1];
-        
+    var response = CONNS[conn_id];
+    if (response) {
         response.writeHead (data.code, data.headers);
         response.write(data.data);
         response.end();
@@ -65,6 +86,7 @@ var responseData = function (conn_id, data) {
 
 function start() {
     function onRequest(request, response) {
+        //console.log('new request...')
         var url_obj = url.parse(request.url);
         //console.log(url_obj);
         var headers = request.headers;
@@ -79,19 +101,53 @@ function start() {
         for (var key in headers) {
             forward_req.headers[key] = headers[key];
         }
-        forward_req.headers['path'] = forward_req.headers['pathname'];
-        forward_req.version = request.httpVersion;
+        forward_req.headers['remote_ip'] = remote_ip;
+        forward_req.url = request.url;
         forward_req.method = request.method;
-        var conn_id = recordConn(request, response);
-        forward_req.meta.conn_id = conn_id; 
+        forward_req.version = request.httpVersion;
+        forward_req.path = url_obj['pathname'];
+        
+        // nodejs default registered two callbacks arealdy on 'close' event
+        if (request.connection.listeners('close').length == 2) {
+            request.connection.on('close', function () {
+                console.log('--> connection closed')
+                removeConn(conn_id);
+            });
+        }
 
-        response.on('close', function () {
-            removeConn(conn_id);
-        });
+        // nodejs default registered one callback arealdy on 'timeout' event
+        if (request.connection.listeners('timeout').length == 1) {
+            request.connection.on('timeout', function () {
+                console.log('--> connection timeout')
+                removeConn(conn_id);
+            });
+        }
+       
+        //console.log('record event callback length: ', request.connection.listeners('record').length);
+        // custom event type, used to record the connection key
+        if (request.connection.listeners('record').length == 0) {
+            // first, record the connection 
+            var conn_id = recordConn(response);
+            forward_req.meta.conn_id = conn_id; 
 
+            //console.log(forward_req);
+            pushRequest(forward_req);
 
-        pushRequest(forward_req);
+            // register a callback to return conn_id for next request on the same keep-alive connection
+            request.connection.on('record', function () {
+                //console.log('--> call record callback');
 
+                return conn_id;
+            });
+        }
+        else {
+            var conn_id = request.connection.listeners('record')[0](); 
+            //console.log('conn key: ', conn_id);
+            refreshResponse(conn_id, response);
+            forward_req.meta.conn_id = conn_id; 
+            pushRequest(forward_req);
+ 
+        }
     }
 
     // listen to the returned zmq pull channel
@@ -119,6 +175,9 @@ function start() {
         }
     });     
 
+    setInterval(function () {
+        console.log('Current CONNS length: ', Object.keys(CONNS).length);
+    }, 5000);
 
     var server = http.createServer(onRequest)
     server.listen(config.port);

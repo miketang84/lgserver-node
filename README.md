@@ -1,4 +1,4 @@
-lgsever-node
+**lgsever-node**
 
 功能需求
 ========
@@ -8,11 +8,11 @@ lgsever-node
 4. tcp socket 监听；
 5. 读取配置；
 6. 记录全局的 conn 对象，在返回的时候找到对应的，发回去；
-7. 解析url和headers，读取body;
+7. 解析url和headers;
 8. 日志记录;
 9. 监控;
 10. 命令行参数（传入不同的配置文件）;
-
+11. 读取body，处理文件上传;
 
 
 依赖
@@ -25,7 +25,7 @@ lgsever-node
 问题
 ====
 TODO：
-1. 连接断开时的事件响应，清理CONNS表；
+1. 读取request body；
 
 
 用法
