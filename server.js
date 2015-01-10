@@ -67,7 +67,7 @@ var wrap = function (res) {
     res.headers = res.headers || {};
     res.headers['content-type'] = res.headers['content-type'] || 'text/plain';
     if (res.data) {
-        res.headers['content-length'] = res.data.length;
+        //res.headers['content-length'] = res.data.length;
         res.headers['transfer-encoding'] = 'chunked';
     }
     else {
