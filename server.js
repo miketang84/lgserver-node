@@ -66,8 +66,12 @@ var wrap = function (res) {
     res.status = res.status || "OK";
     res.headers = res.headers || {};
     res.headers['content-type'] = res.headers['content-type'] || 'text/plain';
-    res.data = res.data || '';
-    res.headers['content-length'] = res.headers['content-length'] || (res.data && res.data.length || 0);
+    if (res.data) {
+        res.headers['content-length'] = res.data.length;
+    }
+    else {
+        delete res.headers['content-length'];
+    }
     return res;
 }
 
