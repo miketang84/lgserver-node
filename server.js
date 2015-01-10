@@ -68,6 +68,7 @@ var wrap = function (res) {
     res.headers['content-type'] = res.headers['content-type'] || 'text/plain';
     if (res.data) {
         res.headers['content-length'] = res.data.length;
+        res.headers['transfer-encoding'] = 'chunked';
     }
     else {
         delete res.headers['content-length'];
@@ -132,6 +133,7 @@ function start() {
         forward_req.method = request.method;
         forward_req.version = request.httpVersion;
         forward_req.path = url_obj['pathname'];
+        forward_req.query_string = url_obj['query'];
         
 
         var processCallback = function (body) {
